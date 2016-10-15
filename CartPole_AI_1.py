@@ -4,6 +4,11 @@ from itertools import count
 import numpy as np
 import json
 
+POPULATION_SIZE = 500
+SURVIVE_RATIO = 0.5
+HIDDEN_UNITS = 10
+NUM_GAMES_PER_AI = 10
+
 # Simple policy network with 1 hidden layer
 class PolicyNetwork(object):
     _ids = count(0)
@@ -11,7 +16,7 @@ class PolicyNetwork(object):
     def __init__(self):
         self.id = next(self._ids)
         self.D = 4 # Input variables
-        self.H = 20 # number of hidden layer neurons
+        self.H = HIDDEN_UNITS # number of hidden layer neurons
         self.network = dict()
         self.network['W1'] = np.random.randn(self.H,self.D) / np.sqrt(self.D) # "Xavier" initialization   
         self.network['W2'] = np.random.randn(self.H) / np.sqrt(self.H)
@@ -65,32 +70,47 @@ def play_episiode(model, max_frames = 1000, render = False):
     return t
 
 
-seed_population = [PolicyNetwork() for x in range(0,100)]
+seed_population = [PolicyNetwork() for x in range(0,POPULATION_SIZE)]
 
 for generation in range(1,10000):
     print("Generation {}".format(generation))
     # Generate new population
-    population = [PolicyNetwork() for x in range(0,1000)]
+    population = [PolicyNetwork() for x in range(0,POPULATION_SIZE)]
     for p in population:
         p.update_from_population(seed_population) 
 
     for model in population:
-        # each model plays 5 games
+        # each AI plays a number of games, and average score counts
         scores = []
-        for i in range(0,10):
+        for i in range(0,NUM_GAMES_PER_AI):
             score = play_episiode(model, render = False)
             scores.append(score)
         model.score = np.mean(scores)
         
     # find population with best score
     print("Population mean score", np.mean([x.score for x in population]))
+    survive_size = int(SURVIVE_RATIO/len(population))
     population = sorted(population, key=lambda k: k.score,reverse=True)[0:10]
     print("Best players",[x.score for x in population])
 
-    # Validation game
-    for i in range(0,1):
-        score = play_episiode(model,render = True)
-        scores.append(score)
+
+    # Test if the best player can beat the challenge 100 games with score higher than 195
+    test_failed = False
+    for i in range(0,100):
+        score = play_episiode(population[0], render = False)
+        print("Test game {}, score {}".format(i,score))
+        if score < 195.0:
+            test_failed = True
+            break
+
+    if not test_failed:
+        print("Test passed!")
+        break
+    else:
+        print("Test failed!")
+
+
+        
 
     seed_population = population
 

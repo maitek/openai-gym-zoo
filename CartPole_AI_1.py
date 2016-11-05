@@ -4,13 +4,12 @@ from itertools import count
 import numpy as np
 import json
 
-
-
 POPULATION_SIZE = 100
 SURVIVE_RATIO = 0.1
 HIDDEN_UNITS = 20
-NUM_GAMES_PER_AI = 1
+NUM_GAMES_PER_AI = 5
 SIGMA_FACTOR = 10
+RENDER = True
 
 # Simple policy network with 1 hidden layer
 class PolicyNetwork(object):
@@ -100,7 +99,7 @@ for generation in range(1,10000):
 
     # Test if the best player can beat the challenge 100 games with score higher than 195
     test_failed = False
-    score = play_episiode(population[0], render = False, max_frames = 200)
+    score = play_episiode(population[0], render = RENDER, max_frames = 1000)
     for i in range(0,100):
         score = play_episiode(population[0], render = False)
         print("Test game {}, score {}".format(i,score))

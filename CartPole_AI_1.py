@@ -4,10 +4,13 @@ from itertools import count
 import numpy as np
 import json
 
-POPULATION_SIZE = 500
-SURVIVE_RATIO = 0.5
-HIDDEN_UNITS = 10
-NUM_GAMES_PER_AI = 10
+
+
+POPULATION_SIZE = 100
+SURVIVE_RATIO = 0.1
+HIDDEN_UNITS = 20
+NUM_GAMES_PER_AI = 1
+SIGMA_FACTOR = 10
 
 # Simple policy network with 1 hidden layer
 class PolicyNetwork(object):
@@ -22,7 +25,7 @@ class PolicyNetwork(object):
         self.network['W2'] = np.random.randn(self.H) / np.sqrt(self.H)
         self.score = 0
 
-    def update_from_population(self,population):
+    def update_from_population(self,population,sigma_factor = SIGMA_FACTOR):
         W1 = np.zeros((len(population),self.H,self.D))
         W2 = np.zeros((len(population),self.H))
         for idx, p in enumerate(population):
@@ -30,11 +33,11 @@ class PolicyNetwork(object):
             W2[idx,:] = p.network['W2']
 
         W1_mu = np.mean(W1,axis=0) 
-        W1_sigma = np.std(W1,axis=0)
+        W1_sigma = np.std(W1,axis=0) * sigma_factor
         self.network['W1'] = W1_sigma*np.random.randn(self.H,self.D) + W1_mu
 
         W2_mu = np.mean(W2,axis=0) 
-        W2_sigma = np.std(W2,axis=0)
+        W2_sigma = np.std(W2,axis=0) * sigma_factor
         self.network['W2'] = W2_sigma*np.random.randn(self.H) + W2_mu
 
 
@@ -54,7 +57,7 @@ class PolicyNetwork(object):
 
 
 # Play an episode using model
-def play_episiode(model, max_frames = 1000, render = False):
+def play_episiode(model, max_frames = 1000, render = False, full = False):
     observation = env.reset()
     t = 0
     for t in range(max_frames):
@@ -62,14 +65,15 @@ def play_episiode(model, max_frames = 1000, render = False):
             env.render()
            
         action = model.decide_action(observation)
+
         observation, reward, done, info = env.step(action)
         
-        if done:
+        if done and not full:
             #print("Model {} finished after {} timesteps".format(model.id,t+1))
             break
     return t
 
-
+print(env.observation_space)
 seed_population = [PolicyNetwork() for x in range(0,POPULATION_SIZE)]
 
 for generation in range(1,10000):
@@ -96,6 +100,7 @@ for generation in range(1,10000):
 
     # Test if the best player can beat the challenge 100 games with score higher than 195
     test_failed = False
+    score = play_episiode(population[0], render = False, max_frames = 200)
     for i in range(0,100):
         score = play_episiode(population[0], render = False)
         print("Test game {}, score {}".format(i,score))
@@ -108,9 +113,6 @@ for generation in range(1,10000):
         break
     else:
         print("Test failed!")
-
-
-        
 
     seed_population = population
 

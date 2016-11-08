@@ -7,8 +7,8 @@ import json
 POPULATION_SIZE = 100
 SURVIVE_RATIO = 0.1
 HIDDEN_UNITS = 20
-NUM_GAMES_PER_AI = 5
-SIGMA_FACTOR = 10
+NUM_GAMES_PER_AI = 1
+SIGMA_FACTOR = 5
 RENDER = True
 
 # Simple policy network with 1 hidden layer
@@ -24,7 +24,7 @@ class PolicyNetwork(object):
         self.network['W2'] = np.random.randn(self.H) / np.sqrt(self.H)
         self.score = 0
 
-    def update_from_population(self,population,sigma_factor = SIGMA_FACTOR):
+    def update_from_population(self, population, sigma_factor = SIGMA_FACTOR):
         W1 = np.zeros((len(population),self.H,self.D))
         W2 = np.zeros((len(population),self.H))
         for idx, p in enumerate(population):
@@ -92,8 +92,8 @@ for generation in range(1,10000):
         
     # find population with best score
     print("Population mean score", np.mean([x.score for x in population]))
-    survive_size = int(SURVIVE_RATIO/len(population))
-    population = sorted(population, key=lambda k: k.score,reverse=True)[0:10]
+    survive_size = int(SURVIVE_RATIO*len(population))
+    population = sorted(population, key=lambda k: k.score,reverse=True)[0:survive_size]
     print("Best players",[x.score for x in population])
 
 

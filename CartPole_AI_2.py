@@ -63,16 +63,14 @@ class PolicyNetwork(object):
         r = rewards.astype(np.float32)
 
         # normalize awards
-        r -= np.mean(r)
-        r /= np.std(r)
+        r /= np.mean(r)
         
         train_loss = 0
         for batch in self.iterate_minibatches(S,a,r, batchsize = 100, shuffle=True):
             _S, _a, _r = batch
-            
             loss = self._update_network(_S, np.squeeze(_a), np.squeeze(_r))
             train_loss += loss
-            #print(loss)
+            
         train_loss /= len(r)
         print("Training loss", train_loss)
         
@@ -150,7 +148,7 @@ for episode in range(1,1000):
     for i in range(0,100):
         episode = play_episiode(model, render = False)
         # discounted reward
-        episode["discount_rewards"] = discount_rewards(episode["rewards"], gamma = 0.9)
+        episode["discount_rewards"] = discount_rewards(episode["rewards"], gamma = 0.99)
         episode['score'] = np.sum(episode["rewards"])
         episodes.append(episode)
         

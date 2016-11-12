@@ -17,8 +17,8 @@ class PolicyNetwork(object):
 
         # Prepare Theano variables for inputs and targets
         input_var = T.matrix('inputs')
-        target_var = T.ivector('targets')
-        reward_var = T.scalar('reward')
+        target_var = T.ivector('actions')
+        reward_var = T.fvector('reward')
         
 
         # Build network structure
@@ -27,6 +27,7 @@ class PolicyNetwork(object):
         # Define Theano update function for training
         prediction = lasagne.layers.get_output(self._network)
         loss = lasagne.objectives.categorical_crossentropy(prediction, target_var)
+        loss *= reward_var 
         loss = loss.mean()
         #grad = # TODO define gradients manually
         
@@ -35,14 +36,13 @@ class PolicyNetwork(object):
         grads = theano.grad(loss,params)
         
 
-        grads_scaled = list()
-        for g in grads:
-            grads_scaled.append(g*reward_var)
+        #grads_scaled = list()
+        #for g in grads:
+        #    grads_scaled.append(g*reward_var)
         
-        updates = lasagne.updates.nesterov_momentum(
-                grads, params, learning_rate=0.001, momentum=0.9)
-
-        self._update_network = theano.function([input_var, target_var, reward_var], loss, updates=updates,on_unused_input='warn')
+        updates = lasagne.updates.adam(grads, params, learning_rate=0.001)
+        
+        self._update_network = theano.function([input_var, target_var, reward_var], loss, updates=updates, on_unused_input='warn')
 
         # Define Theano forward function pass for prediction
         test_prediction = lasagne.layers.get_output(self._network, deterministic=True)        
@@ -68,24 +68,26 @@ class PolicyNetwork(object):
     # Update network parameters 
     def update_network(self,observations,actions,rewards):
         
-        X = observations.astype(np.float32)
-        y = actions.astype(np.int32)
+        S = observations.astype(np.float32)
+        a = actions.astype(np.int32)
         r = rewards.astype(np.float32)
 
         # normalize awards
         r -= np.mean(r)
         r /= np.std(r)
-        #print(r[:100])
-        #exit()
         
         train_loss = 0
-        for i in range(0,len(r)):
-            _X = X[i:i+1,:]
-            _y = y[i,:]
-            _r = r[i][0]
-            train_loss += self._update_network(_X, _y, _r)
+        for batch in self.iterate_minibatches(S,a,r, batchsize = 200, shuffle=True):
+            _S, _a, _r = batch
+            
+            loss = self._update_network(_S, np.squeeze(_a), np.squeeze(_r))
+            train_loss += loss
+            #print(loss)
         train_loss /= len(r)
         print("Training loss", train_loss)
+        
+
+
 
     # Choose an action depending on probabilities given an observation
     def decide_action(self,observation):
@@ -95,17 +97,18 @@ class PolicyNetwork(object):
         action = np.random.choice(self._possible_actions, 1, p=probabilities)[0]
         return action
 
-    def iterate_minibatches(self, inputs, targets, batchsize, shuffle=False):
-        assert len(inputs) == len(targets)
+    def iterate_minibatches(self, observation, actions, rewards,  batchsize, shuffle=False):
+        assert len(observation) == len(actions)
+        assert len(observation) == len(rewards)
         if shuffle:
-            indices = np.arange(len(inputs))
+            indices = np.arange(len(observation))
             np.random.shuffle(indices)
-        for start_idx in range(0, len(inputs) - batchsize + 1, batchsize):
+        for start_idx in range(0, len(observation) - batchsize + 1, batchsize):
             if shuffle:
                 excerpt = indices[start_idx:start_idx + batchsize]
             else:
                 excerpt = slice(start_idx, start_idx + batchsize)
-            yield inputs[excerpt], targets[excerpt]
+            yield observation[excerpt], actions[excerpt], rewards[excerpt]
 
 
 
@@ -146,13 +149,13 @@ def play_episiode(model, max_frames = 1000, render = False):
         episode['rewards'].append(reward)
 
         if done:
-            #print("Episode finished after {} timesteps".format(t+1))
-            # convert to numpy array
-            episode['observations'] = np.vstack(episode['observations'])
-            episode['actions'] = np.vstack(episode['actions'])
-            episode['rewards'] = np.vstack(episode['rewards'])
-
             break
+
+    #print("Episode finished after {} timesteps".format(t+1))
+    # convert to numpy array
+    episode['observations'] = np.vstack(episode['observations'])
+    episode['actions'] = np.vstack(episode['actions'])
+    episode['rewards'] = np.vstack(episode['rewards'])
     return episode
 
 
@@ -180,6 +183,11 @@ for episode in range(1,1000):
     actions_all = np.vstack([x["actions"] for x in episodes])
     scores_all = np.vstack([x["score"] for x in episodes]) 
 
+    print(observations_all.shape)
+    print(rewards_all.shape)
+    print(actions_all.shape)
+    
+    
     print("Mean score", np.mean(scores_all))
     # update weights
     model.update_network(observations_all,actions_all,rewards_all)
@@ -191,32 +199,4 @@ for episode in range(1,1000):
 
 
 
-"""        
-    # find population with best score
-    print("Population mean score", np.mean([x.score for x in population]))
-    survive_size = int(SURVIVE_RATIO/len(population))
-    population = sorted(population, key=lambda k: k.score,reverse=True)[0:10]
-    print("Best players",[x.score for x in population])
 
-
-    # Test if the best player can beat the challenge 100 games with score higher than 195
-    test_failed = False
-    score = play_episiode(population[0], render = True, max_frames = 200)
-    for i in range(0,100):
-        score = play_episiode(population[0], render = False)
-        print("Test game {}, score {}".format(i,score))
-        if score < 195.0:
-            test_failed = True
-            break
-
-    if not test_failed:
-        print("Test passed!")
-        break
-    else:
-        print("Test failed!")
-
-
-        
-
-    seed_population = population
-"""

@@ -24,21 +24,16 @@ class PolicyNetwork(object):
         # Build network structure
         self._network = self._build_network(input_var,size_observations,len(possible_actions))
         print(self._network)
-        # Define Theano update function for training
+        
+        # Define Policy Loss function that increases propability of good action
         prediction = lasagne.layers.get_output(self._network)
         loss = lasagne.objectives.categorical_crossentropy(prediction, target_var)
-        loss *= reward_var 
-        loss = loss.mean()
-        #grad = # TODO define gradients manually
+        loss = T.dot(loss,reward_var)
+        #loss *= reward_var 
+        #loss = loss.sum()
         
-
         params = lasagne.layers.get_all_params(self._network, trainable=True)
         grads = theano.grad(loss,params)
-        
-
-        #grads_scaled = list()
-        #for g in grads:
-        #    grads_scaled.append(g*reward_var)
         
         updates = lasagne.updates.adam(grads, params, learning_rate=0.001)
         
@@ -60,11 +55,6 @@ class PolicyNetwork(object):
                 nonlinearity=softmax)
             return network
 
-    def _discounted_rewards(self,r):
-        dr = np.cumsum(r) #[::-1]
-
-        return dr
-
     # Update network parameters 
     def update_network(self,observations,actions,rewards):
         
@@ -77,7 +67,7 @@ class PolicyNetwork(object):
         r /= np.std(r)
         
         train_loss = 0
-        for batch in self.iterate_minibatches(S,a,r, batchsize = 200, shuffle=True):
+        for batch in self.iterate_minibatches(S,a,r, batchsize = 100, shuffle=True):
             _S, _a, _r = batch
             
             loss = self._update_network(_S, np.squeeze(_a), np.squeeze(_r))
@@ -110,14 +100,6 @@ class PolicyNetwork(object):
                 excerpt = slice(start_idx, start_idx + batchsize)
             yield observation[excerpt], actions[excerpt], rewards[excerpt]
 
-
-
-
-
-
-#def discounted_rewards(r):
-#    r = np.multiply(r,np.sum(r))
-#    return r 
 
 def discount_rewards(r,gamma):
     """ take 1D float array of rewards and compute discounted reward """
@@ -158,8 +140,6 @@ def play_episiode(model, max_frames = 1000, render = False):
     episode['rewards'] = np.vstack(episode['rewards'])
     return episode
 
-
-
 model = PolicyNetwork(size_observations=4, possible_actions=[0,1])
 
 for episode in range(1,1000):
@@ -171,9 +151,6 @@ for episode in range(1,1000):
         episode = play_episiode(model, render = False)
         # discounted reward
         episode["discount_rewards"] = discount_rewards(episode["rewards"], gamma = 0.9)
-        #print("rew",episode["rewards"])
-        #print("drew",episode["discount_rewards"])
-        #exit()
         episode['score'] = np.sum(episode["rewards"])
         episodes.append(episode)
         
@@ -182,11 +159,6 @@ for episode in range(1,1000):
     rewards_all = np.vstack([x["discount_rewards"] for x in episodes])
     actions_all = np.vstack([x["actions"] for x in episodes])
     scores_all = np.vstack([x["score"] for x in episodes]) 
-
-    print(observations_all.shape)
-    print(rewards_all.shape)
-    print(actions_all.shape)
-    
     
     print("Mean score", np.mean(scores_all))
     # update weights

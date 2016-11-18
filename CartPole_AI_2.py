@@ -65,8 +65,8 @@ class PolicyNetwork(object):
         # normalize awards
         #r -= np.mean(r)
 
-        r /= np.mean(r)
-        #r /= np.std(r)
+        #r /= np.mean(r)
+        r /= np.std(r)
 
         train_loss = 0
         for batch in self.iterate_minibatches(S,a,r, batchsize = 100, shuffle=True):

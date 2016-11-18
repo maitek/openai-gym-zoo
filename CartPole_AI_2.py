@@ -66,11 +66,8 @@ class PolicyNetwork(object):
         #r -= np.mean(r)
 
         r /= np.mean(r)
-        r /= np.std(r)
-        
+        #r /= np.std(r)
 
-
-        
         train_loss = 0
         for batch in self.iterate_minibatches(S,a,r, batchsize = 100, shuffle=True):
             _S, _a, _r = batch
@@ -146,26 +143,50 @@ def play_episiode(model, max_frames = 1000, render = False):
 
 model = PolicyNetwork(size_observations=4, possible_actions=[0,1])
 
+observations_all = None
+rewards_all = None
+actions_all = None
+scores_all = None
+
+episode_number = 0
 for episode in range(1,1000):
 
     # play episodes
     episodes = list()
 
-    for i in range(0,100):
-        episode = play_episiode(model, render = False)
+    for i in range(0,1):
+
+        episode = play_episiode(model, render = True)
+        episode_number += 1
         # discounted reward
         episode["discount_rewards"] = discount_rewards(episode["rewards"], gamma = 0.99)
         
         episode['score'] = np.sum(episode["rewards"])
         episodes.append(episode)
-        
+
     # concatenate episodes
-    observations_all = np.vstack([x["observations"] for x in episodes])
-    rewards_all = np.vstack([x["discount_rewards"] for x in episodes])
-    actions_all = np.vstack([x["actions"] for x in episodes])
-    scores_all = np.vstack([x["score"] for x in episodes]) 
+    observations_new = np.vstack([x["observations"] for x in episodes])
+    rewards_new = np.vstack([x["discount_rewards"] for x in episodes])
+    actions_new = np.vstack([x["actions"] for x in episodes])
+    scores_new = np.vstack([x["score"] for x in episodes])
+
+    episode_discount = 0.9
+    reward_eps = 0.01
+    max_len = 1000000
+
+    episode_bonus = np.sum(scores_new)
+
+    observations_all = observations_new if observations_all is None else np.vstack((observations_all,observations_new))[:max_len,:] 
+    rewards_all = rewards_new if rewards_all is None else np.vstack((rewards_all*episode_discount,rewards_new*episode_bonus))[:max_len,:] 
+    actions_all = actions_new if actions_all is None else np.vstack((actions_all,actions_new))[:max_len,:] 
+
+    scores_all = scores_new if scores_all is None else np.vstack((scores_all,scores_new))
     
-    print("Mean score", np.mean(scores_all))
+    #print(rewards_all.shape)
+    #rewards_all = rewards_all[rewards_all < reward_eps][:]
+    #print(rewards_all.shape)
+    
+    print("Episode {}, mean score {}".format(episode_number,np.mean(scores_new)))
     # update weights
     model.update_network(observations_all,actions_all,rewards_all)
 

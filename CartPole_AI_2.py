@@ -14,34 +14,35 @@ class PolicyNetwork(object):
         # List all possible action
         self._possible_actions = possible_actions
         self._size_observations = size_observations
+        self._learning_rate = 0.001
 
         # Prepare Theano variables for inputs and targets
-        input_var = T.matrix('inputs')
-        target_var = T.ivector('actions')
+        observation_var = T.matrix('observations')
+        action_var = T.ivector('actions')
         reward_var = T.fvector('reward')
-        
+        learning_rate = T.scalar('learning_rate')
 
         # Build network structure
-        self._network = self._build_network(input_var,size_observations,len(possible_actions))
+        self._network = self._build_network(observation_var,size_observations,len(possible_actions))
         print(self._network)
         
-        # Define Policy Loss function that increases propability of good action
-        prediction = lasagne.layers.get_output(self._network)
-        loss = lasagne.objectives.categorical_crossentropy(prediction, target_var)
-        loss = T.dot(loss,reward_var)
-        #loss *= reward_var 
-        #loss = loss.sum()
-        
+        probs = lasagne.layers.get_output(self._network)
+
+        # Define Policy Loss function that increases propability of good action   
+        log_policy = lasagne.objectives.categorical_crossentropy(probs, action_var)
+        loss = T.dot(log_policy,reward_var)
+
+        # Calculate gradient
         params = lasagne.layers.get_all_params(self._network, trainable=True)
         grads = theano.grad(loss,params)
+
+        updates = lasagne.updates.adam(grads, params, learning_rate=learning_rate)
         
-        updates = lasagne.updates.adam(grads, params, learning_rate=0.001)
-        
-        self._update_network = theano.function([input_var, target_var, reward_var], loss, updates=updates, on_unused_input='warn')
+        self._update_network = theano.function([observation_var, action_var, reward_var, learning_rate], loss, updates=updates, on_unused_input='warn')
 
         # Define Theano forward function pass for prediction
         test_prediction = lasagne.layers.get_output(self._network, deterministic=True)        
-        self._forward_pass = theano.function([input_var], test_prediction)
+        self._forward_pass = theano.function([observation_var], test_prediction)
 
 
     # Define network architecture
@@ -63,18 +64,21 @@ class PolicyNetwork(object):
         r = rewards.astype(np.float32)
 
         # normalize awards
-        #r -= np.mean(r)
-
-        #r /= np.mean(r)
         r /= np.std(r)
-
+        print("min",np.min(r))
+        
         train_loss = 0
         for batch in self.iterate_minibatches(S,a,r, batchsize = 100, shuffle=True):
             _S, _a, _r = batch
-            loss = self._update_network(_S, np.squeeze(_a), np.squeeze(_r))
+            loss = self._update_network(_S, np.squeeze(_a), np.squeeze(_r), self._learning_rate)
             train_loss += loss
             
         train_loss /= len(r)
+
+        # decay learning rate
+        #self._learning_rate = self._learning_rate*0.99
+        #print(self._learning_rate)
+
         print("Training loss", train_loss)
         
 
@@ -170,8 +174,7 @@ for episode in range(1,1000):
     actions_new = np.vstack([x["actions"] for x in episodes])
     scores_new = np.vstack([x["score"] for x in episodes])
 
-    episode_discount = 0.9
-    reward_eps = 0.01
+    episode_discount = 0.95
     max_len = 1000000
 
     episode_bonus = np.sum(scores_new)

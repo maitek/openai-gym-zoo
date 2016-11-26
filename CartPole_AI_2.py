@@ -65,7 +65,8 @@ class PolicyNetwork(object):
 
         # normalize awards
         r /= np.std(r)
-        print("min",np.min(r))
+        r -= np.mean(r) 
+        r[r < 0] = 0
         
         train_loss = 0
         for batch in self.iterate_minibatches(S,a,r, batchsize = 100, shuffle=True):
@@ -74,16 +75,15 @@ class PolicyNetwork(object):
             train_loss += loss
             
         train_loss /= len(r)
+        #print(r)
 
         # decay learning rate
         #self._learning_rate = self._learning_rate*0.99
         #print(self._learning_rate)
 
         print("Training loss", train_loss)
+        print("")
         
-
-
-
     # Choose an action depending on probabilities given an observation
     def decide_action(self,observation):
         X = np.vstack(observation).T

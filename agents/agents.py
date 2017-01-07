@@ -16,11 +16,11 @@ class Agent(object):
         return np.random.choice(possible_actions)
 
 class PolicyNetwork(Agent):
-    def __init__(self, size_observations, possible_actions):
+    def __init__(self, size_observations, possible_actions, learning_rate = 0.5):
         # List all possible action
         self._possible_actions = possible_actions
         self._size_observations = size_observations
-        self._learning_rate = 0.1
+        self._learning_rate = learning_rate
 
         # Prepare Theano variables for inputs and targets
         observation_var = T.matrix('observations')
@@ -98,7 +98,7 @@ class PolicyNetwork(Agent):
         action = np.random.choice(self._possible_actions, 1, p=probabilities)[0]
         return action
 
-    def iterate_minibatches(self, observation, actions, rewards,  batchsize, shuffle=False):
+    def iterate_minibatches(self, observation, actions, rewards,  batchsize, shuffle=True):
         assert len(observation) == len(actions)
         assert len(observation) == len(rewards)
         if shuffle:
